@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PhoneFrame from "@/components/PhoneFrame";
 import Header from "@/components/Header";
@@ -34,7 +34,7 @@ function parseTestDate(searchParams: ReturnType<typeof useSearchParams>): string
   return testdate && TESTDATE_RE.test(testdate) ? testdate : null;
 }
 
-export default function Home() {
+function HomeContent() {
   const searchParams = useSearchParams();
   const testDate = useMemo(() => parseTestDate(searchParams), [searchParams]);
   const todayForFetch = testDate ?? getTodayWordDate();
@@ -189,5 +189,13 @@ export default function Home() {
         <Lightbox pin={lightboxPin} onClose={handleCloseLightbox} />
       )}
     </PhoneFrame>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <HomeContent />
+    </Suspense>
   );
 }
