@@ -7,7 +7,7 @@ interface CaptureButtonProps {
 export default function CaptureButton({ onClick }: CaptureButtonProps) {
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 px-4 pb-12 pt-4 bg-background border-t-[5px] border-black"
+      className="absolute bottom-0 left-0 right-0 px-4 pb-12 pt-4 bg-background border-t-[6px] border-black"
       style={{ zIndex: 100 }}
     >
       <button

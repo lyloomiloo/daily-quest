@@ -161,7 +161,7 @@ function PageContent() {
             <div className="absolute inset-0 z-[1]">
               <MapView pins={pins} onPinClick={handlePinClick} newPinId={newPin?.id ?? null} />
             </div>
-            <div className="absolute top-0 left-0 right-0 z-[100] border-b-[5px] border-black">
+            <div className="absolute top-0 left-0 right-0 z-[100] border-b-[6px] border-black">
               <Header dateStr={dateStr} countdown={countdown} />
               <DailyWordSection
                 wordEn={dailyWord.word_en}
