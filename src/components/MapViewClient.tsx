@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, ZoomControl } from "react-leaflet";
+import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import L from "leaflet";
 import type { LatLngExpression } from "leaflet";
 import type { Pin } from "@/lib/data";
@@ -31,7 +31,7 @@ function createPinIcon(pin: Pin, isNew: boolean): L.DivIcon {
 }
 
 const USER_LOCATION_ICON = L.divIcon({
-  html: `<div class="user-location-dot" style="width:11px;height:11px;border-radius:50%;background:#4285F4;box-shadow:0 0 0 3px rgba(66,133,244,0.4);"></div>`,
+  html: `<div class="user-location-dot" style="width:11px;height:11px;border-radius:50%;background:#4285F4;box-shadow:0 0 0 3px rgba(66,133,244,0.4);animation:user-location-pulse 2s ease-in-out infinite;"></div>`,
   className: "custom-pin-no-default",
   iconSize: [11, 11],
   iconAnchor: [5.5, 5.5],
@@ -55,24 +55,33 @@ export default function MapViewClient({
   const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    if (!navigator.geolocation) return;
-    const onSuccess = (pos: GeolocationPosition) => {
-      setUserPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    if (typeof window === "undefined" || !window.navigator?.geolocation) return;
+    let watchId: number | undefined;
+    const timeoutId = window.setTimeout(() => {
+      const geo = window.navigator.geolocation;
+      const onSuccess = (pos: GeolocationPosition) => {
+        const { latitude, longitude } = pos.coords;
+        if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+          setUserPosition({ lat: latitude, lng: longitude });
+        }
+      };
+      const onError = () => {
+        // Permission denied or error: don't show dot, no message
+      };
+      const options: PositionOptions = {
+        enableHighAccuracy: false,
+        timeout: 15000,
+        maximumAge: 60000,
+      };
+      geo.getCurrentPosition(onSuccess, onError, options);
+      watchId = geo.watchPosition(onSuccess, onError, options);
+    }, 100);
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (watchId != null && window.navigator?.geolocation) {
+        window.navigator.geolocation.clearWatch(watchId);
+      }
     };
-    const onError = () => {
-      // Permission denied or error: don't show dot, no message
-    };
-    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0,
-    });
-    const watchId = navigator.geolocation.watchPosition(onSuccess, onError, {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 5000,
-    });
-    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
   return (
@@ -83,7 +92,6 @@ export default function MapViewClient({
       style={{ zIndex: 1 }}
       zoomControl={false}
     >
-      <ZoomControl position="bottomright" />
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
       {userPosition && (
         <Marker

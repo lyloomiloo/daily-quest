@@ -7,7 +7,7 @@ interface DailyWordSectionProps {
 
 export default function DailyWordSection({ wordEn, wordEs }: DailyWordSectionProps) {
   return (
-    <div className="px-4 pt-2 pb-1 shrink-0 bg-background">
+    <div className="px-4 pt-2 pb-3 shrink-0 bg-background">
       <div
         className="font-mono text-[#888]"
         style={{ fontSize: "9px" }}

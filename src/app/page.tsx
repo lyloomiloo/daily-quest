@@ -11,6 +11,7 @@ import Lightbox from "@/components/Lightbox";
 import CameraView from "@/components/CameraView";
 import PhotoPreview from "@/components/PhotoPreview";
 import UploadConfirmation from "@/components/UploadConfirmation";
+import LocationGate from "@/components/LocationGate";
 import { type Pin, type DailyWord } from "@/lib/data";
 import {
   getCountdownToMidnightMadrid,
@@ -143,33 +144,32 @@ function PageContent() {
   const handleBackFromCamera = () => setScreen("map");
   const handleBackFromPreview = () => setScreen("camera");
 
-  if (dailyWord === null) {
-    return (
+  const appContent =
+    dailyWord === null ? (
       <PhoneFrame>
         <div className="flex h-full min-h-[100dvh] items-center justify-center bg-background font-mono text-sm text-muted">
           Loading…
         </div>
       </PhoneFrame>
-    );
-  }
-
-  return (
-    <PhoneFrame>
+    ) : (
+      <PhoneFrame>
       <div className="relative h-full min-h-0" style={{ minHeight: "100dvh" }}>
         {screen === "map" && (
-          <>
-            <div className="absolute inset-0 z-[1]">
-              <MapView pins={pins} onPinClick={handlePinClick} newPinId={newPin?.id ?? null} />
-            </div>
-            <div className="absolute top-0 left-0 right-0 z-[100] border-b-[6px] border-black">
+          <div className="flex flex-col h-full" style={{ minHeight: "100dvh" }}>
+            <div className="shrink-0 z-[100] border-b-[4px] border-black">
               <Header dateStr={dateStr} countdown={countdown} />
               <DailyWordSection
                 wordEn={dailyWord.word_en}
                 wordEs={dailyWord.word_es}
               />
             </div>
-            <CaptureButton onClick={handleCaptureClick} />
-          </>
+            <div className="flex-1 min-h-0 relative z-[1]">
+              <MapView pins={pins} onPinClick={handlePinClick} newPinId={newPin?.id ?? null} />
+            </div>
+            <div className="shrink-0">
+              <CaptureButton onClick={handleCaptureClick} />
+            </div>
+          </div>
         )}
 
         {screen === "camera" && (
@@ -199,7 +199,9 @@ function PageContent() {
         <Lightbox pin={lightboxPin} onClose={handleCloseLightbox} />
       )}
     </PhoneFrame>
-  );
+    );
+
+  return <LocationGate>{appContent}</LocationGate>;
 }
 
 export default function Home() {
