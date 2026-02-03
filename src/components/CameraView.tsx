@@ -121,7 +121,7 @@ export default function CameraView({
 
       <div className="px-4 pb-4 pt-2 flex flex-col items-center gap-4 shrink-0">
         <p className="font-mono text-xs uppercase tracking-wider text-[#666] text-center">
-          FIND AND FRAME A &quot;{wordEn}&quot;
+          FIND AND FRAME {wordEn}
         </p>
         <button
           type="button"

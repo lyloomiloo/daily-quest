@@ -11,7 +11,7 @@ import Lightbox from "@/components/Lightbox";
 import CameraView from "@/components/CameraView";
 import PhotoPreview from "@/components/PhotoPreview";
 import UploadConfirmation from "@/components/UploadConfirmation";
-import { getSamplePins, type Pin, type DailyWord } from "@/lib/data";
+import { type Pin, type DailyWord } from "@/lib/data";
 import {
   getCountdownToMidnightMadrid,
   formatDateHeader,
@@ -39,7 +39,7 @@ function PageContent() {
   const testDate = useMemo(() => parseTestDate(searchParams), [searchParams]);
   const todayForFetch = testDate ?? getTodayWordDate();
 
-  const [pins, setPins] = useState<Pin[]>(() => getSamplePins());
+  const [pins, setPins] = useState<Pin[]>([]);
   const [lightboxPin, setLightboxPin] = useState<Pin | null>(null);
   const [screen, setScreen] = useState<Screen>("map");
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
@@ -97,7 +97,7 @@ function PageContent() {
     dailyWordPromiseRef.current.then(setDailyWord);
 
     fetchPinsForDate(todayForFetch).then((dbPins) => {
-      setPins(dbPins.length > 0 ? dbPins : getSamplePins());
+      setPins(dbPins ?? []);
     });
   }, [todayForFetch]);
 
