@@ -2,7 +2,8 @@ import { supabase } from "./supabase";
 import type { Pin } from "./data";
 
 /**
- * Fetch pins from Supabase for a given word_date (YYYY-MM-DD).
+ * Fetch pins from Supabase for a given word_date (YYYY-MM-DD, typically today in Madrid).
+ * Only returns pins where word_date = wordDate; old pins stay in DB but never display.
  * Returns pins in app Pin shape; empty array if Supabase is not configured or query fails.
  */
 export async function fetchPinsForDate(wordDate: string): Promise<Pin[]> {

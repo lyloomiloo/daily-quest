@@ -16,7 +16,7 @@ interface MapViewProps {
 
 export default function MapView({ pins, onPinClick, newPinId = null }: MapViewProps) {
   return (
-    <div className="absolute inset-0" style={{ zIndex: 1 }}>
+    <div className="absolute inset-0 border-t-2 border-b-2 border-black" style={{ zIndex: 1 }}>
       <MapViewClient
         center={BARCELONA_CENTER}
         zoom={DEFAULT_ZOOM}
