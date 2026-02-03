@@ -5,6 +5,10 @@ import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import L from "leaflet";
 import type { LatLngExpression } from "leaflet";
 import type { Pin } from "@/lib/data";
+import {
+  GEOLOCATION_OPTIONS,
+  handleGeolocationError,
+} from "@/lib/geolocation";
 
 const TILE_URL =
   "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
@@ -53,6 +57,7 @@ export default function MapViewClient({
   newPinId = null,
 }: MapViewClientProps) {
   const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.navigator?.geolocation) return;
@@ -60,21 +65,24 @@ export default function MapViewClient({
     const timeoutId = window.setTimeout(() => {
       const geo = window.navigator.geolocation;
       const onSuccess = (pos: GeolocationPosition) => {
+        setLocationError(null);
         const { latitude, longitude } = pos.coords;
         if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
           setUserPosition({ lat: latitude, lng: longitude });
         }
       };
-      const onError = () => {
-        // Permission denied or error: don't show dot, no message
+      const onError = (error: GeolocationPositionError) => {
+        handleGeolocationError(error);
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationError("Please enable location in your Browser/System settings.");
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          setLocationError("Location unavailable. Check GPS or try again.");
+        } else if (error.code === error.TIMEOUT) {
+          setLocationError("Location request timed out. Try again.");
+        }
       };
-      const options: PositionOptions = {
-        enableHighAccuracy: false,
-        timeout: 15000,
-        maximumAge: 60000,
-      };
-      geo.getCurrentPosition(onSuccess, onError, options);
-      watchId = geo.watchPosition(onSuccess, onError, options);
+      geo.getCurrentPosition(onSuccess, onError, GEOLOCATION_OPTIONS);
+      watchId = geo.watchPosition(onSuccess, onError, GEOLOCATION_OPTIONS);
     }, 100);
     return () => {
       window.clearTimeout(timeoutId);
@@ -85,15 +93,24 @@ export default function MapViewClient({
   }, []);
 
   return (
-    <MapContainer
-      center={center}
-      zoom={zoom}
-      className="h-full w-full"
-      style={{ zIndex: 1 }}
-      zoomControl={false}
-    >
-      <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
-      {userPosition && (
+    <div className="relative h-full w-full">
+      {locationError && (
+        <div
+          className="absolute bottom-2 left-2 right-2 z-[200] bg-black/80 text-white font-mono text-xs px-3 py-2 text-center"
+          role="alert"
+        >
+          {locationError}
+        </div>
+      )}
+      <MapContainer
+        center={center}
+        zoom={zoom}
+        className="h-full w-full"
+        style={{ zIndex: 1 }}
+        zoomControl={false}
+      >
+        <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+        {userPosition && (
         <Marker
           position={[userPosition.lat, userPosition.lng]}
           icon={USER_LOCATION_ICON}
@@ -115,6 +132,7 @@ export default function MapViewClient({
           }}
         />
       ))}
-    </MapContainer>
+      </MapContainer>
+    </div>
   );
 }
