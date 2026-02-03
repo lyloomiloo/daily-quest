@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, ZoomControl } from "react-leaflet";
 import L from "leaflet";
 import type { LatLngExpression } from "leaflet";
@@ -29,6 +30,13 @@ function createPinIcon(pin: Pin, isNew: boolean): L.DivIcon {
   });
 }
 
+const USER_LOCATION_ICON = L.divIcon({
+  html: `<div class="user-location-dot" style="width:11px;height:11px;border-radius:50%;background:#4285F4;box-shadow:0 0 0 3px rgba(66,133,244,0.4);"></div>`,
+  className: "custom-pin-no-default",
+  iconSize: [11, 11],
+  iconAnchor: [5.5, 5.5],
+});
+
 interface MapViewClientProps {
   center: LatLngExpression;
   zoom: number;
@@ -44,6 +52,29 @@ export default function MapViewClient({
   onPinClick,
   newPinId = null,
 }: MapViewClientProps) {
+  const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const onSuccess = (pos: GeolocationPosition) => {
+      setUserPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    };
+    const onError = () => {
+      // Permission denied or error: don't show dot, no message
+    };
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    });
+    const watchId = navigator.geolocation.watchPosition(onSuccess, onError, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 5000,
+    });
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
   return (
     <MapContainer
       center={center}
@@ -54,11 +85,19 @@ export default function MapViewClient({
     >
       <ZoomControl position="bottomright" />
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+      {userPosition && (
+        <Marker
+          position={[userPosition.lat, userPosition.lng]}
+          icon={USER_LOCATION_ICON}
+          zIndexOffset={-100}
+        />
+      )}
       {pins.map((pin) => (
         <Marker
           key={pin.id}
           position={[pin.latitude, pin.longitude]}
           icon={createPinIcon(pin, pin.id === newPinId)}
+          zIndexOffset={100}
           eventHandlers={{
             click: (e) => {
               e.originalEvent.stopPropagation();

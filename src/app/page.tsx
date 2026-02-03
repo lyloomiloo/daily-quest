@@ -18,7 +18,7 @@ import {
   getTodayWordDate,
 } from "@/lib/countdown";
 import { fetchPinsForDate } from "@/lib/pins";
-import { getDailyWord, getFallbackWord } from "@/lib/words";
+import { getDailyWord, getCachedWord, setCachedWord } from "@/lib/words";
 
 type Screen =
   | "map"
@@ -45,12 +45,8 @@ function PageContent() {
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [newPin, setNewPin] = useState<Pin | null>(null);
 
-  const [dailyWord, setDailyWord] = useState<DailyWord>(() =>
-    getFallbackWord(getTodayWordDate())
-  );
-
-  const dailyWordPromiseRef = useRef<Promise<DailyWord> | null>(null);
-  const todayForFetchRef = useRef<string | null>(null);
+  const [dailyWord, setDailyWord] = useState<DailyWord | null>(null);
+  const wordFetchRef = useRef<{ date: string; promise: Promise<DailyWord> } | null>(null);
 
   const [dateStrState, setDateStrState] = useState(() =>
     formatDateHeader(new Date())
@@ -81,24 +77,28 @@ function PageContent() {
     return () => clearInterval(interval);
   }, [testDate]);
 
-  // Fetch today's daily word once per todayForFetch; use testdate when ?testdate=YYYY-MM-DD
+  // Single source of truth: fetch word ONCE per todayForFetch (cache first, then one getDailyWord call)
   useEffect(() => {
-    const dateChanged =
-      todayForFetchRef.current !== null &&
-      todayForFetchRef.current !== todayForFetch;
-    if (dateChanged) {
-      dailyWordPromiseRef.current = null;
+    const cached = getCachedWord(todayForFetch);
+    if (cached) {
+      setDailyWord(cached);
+      fetchPinsForDate(todayForFetch).then((dbPins) => setPins(dbPins ?? []));
+      return;
     }
-    todayForFetchRef.current = todayForFetch;
 
-    if (!dailyWordPromiseRef.current) {
-      dailyWordPromiseRef.current = getDailyWord(todayForFetch);
+    let promise: Promise<DailyWord>;
+    if (wordFetchRef.current?.date === todayForFetch) {
+      promise = wordFetchRef.current.promise;
+    } else {
+      promise = getDailyWord(todayForFetch);
+      wordFetchRef.current = { date: todayForFetch, promise };
     }
-    dailyWordPromiseRef.current.then(setDailyWord);
-
-    fetchPinsForDate(todayForFetch).then((dbPins) => {
-      setPins(dbPins ?? []);
+    promise.then((word) => {
+      setDailyWord(word);
+      setCachedWord(todayForFetch, word);
     });
+
+    fetchPinsForDate(todayForFetch).then((dbPins) => setPins(dbPins ?? []));
   }, [todayForFetch]);
 
   const handlePinClick = (pin: Pin) => {
@@ -143,6 +143,16 @@ function PageContent() {
   const handleBackFromCamera = () => setScreen("map");
   const handleBackFromPreview = () => setScreen("camera");
 
+  if (dailyWord === null) {
+    return (
+      <PhoneFrame>
+        <div className="flex h-full min-h-[100dvh] items-center justify-center bg-background font-mono text-sm text-muted">
+          Loading…
+        </div>
+      </PhoneFrame>
+    );
+  }
+
   return (
     <PhoneFrame>
       <div className="relative h-full min-h-0" style={{ minHeight: "100dvh" }}>
@@ -151,7 +161,7 @@ function PageContent() {
             <div className="absolute inset-0 z-[1]">
               <MapView pins={pins} onPinClick={handlePinClick} newPinId={newPin?.id ?? null} />
             </div>
-            <div className="absolute top-0 left-0 right-0 z-[100]">
+            <div className="absolute top-0 left-0 right-0 z-[100] border-b-[5px] border-black">
               <Header dateStr={dateStr} countdown={countdown} />
               <DailyWordSection
                 wordEn={dailyWord.word_en}
