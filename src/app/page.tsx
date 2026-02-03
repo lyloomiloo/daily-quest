@@ -34,7 +34,7 @@ function parseTestDate(searchParams: ReturnType<typeof useSearchParams>): string
   return testdate && TESTDATE_RE.test(testdate) ? testdate : null;
 }
 
-function HomeContent() {
+function PageContent() {
   const searchParams = useSearchParams();
   const testDate = useMemo(() => parseTestDate(searchParams), [searchParams]);
   const todayForFetch = testDate ?? getTodayWordDate();
@@ -195,7 +195,7 @@ function HomeContent() {
 export default function Home() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <HomeContent />
+      <PageContent />
     </Suspense>
   );
 }
