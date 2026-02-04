@@ -27,7 +27,6 @@ const DEFAULT_ZOOM = 15;
 type Screen =
   | "map"
   | "lightbox"
-  | "camera-loading"
   | "camera"
   | "preview"
   | "upload-confirm";
@@ -50,7 +49,6 @@ function PageContent() {
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [newPin, setNewPin] = useState<Pin | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
-  const cameraStreamRef = useRef<MediaStream | null>(null);
 
   const [dailyWord, setDailyWord] = useState<DailyWord | null>(null);
   const wordFetchRef = useRef<{ date: string; promise: Promise<DailyWord> } | null>(null);
@@ -99,32 +97,6 @@ function PageContent() {
     );
   }, []);
 
-  // Preload camera stream when user taps SNAPP (camera-loading); show camera only when stream is ready
-  useEffect(() => {
-    if (screen !== "camera-loading") return;
-    let cancelled = false;
-    const start = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        cameraStreamRef.current = stream;
-        setScreen("camera");
-      } catch {
-        if (!cancelled) setScreen("map");
-      }
-    };
-    start();
-    return () => {
-      cancelled = true;
-    };
-  }, [screen]);
-
   // Single source of truth: fetch word ONCE per todayForFetch (cache first, then one getDailyWord call)
   useEffect(() => {
     const cached = getCachedWord(todayForFetch);
@@ -160,7 +132,7 @@ function PageContent() {
   };
 
   const handleCaptureClick = () => {
-    setScreen("camera-loading");
+    setScreen("camera");
   };
 
   const handlePhotoCaptured = (blob: Blob) => {
@@ -170,7 +142,7 @@ function PageContent() {
 
   const handleRetake = () => {
     setCapturedBlob(null);
-    setScreen("camera-loading");
+    setScreen("camera");
   };
 
   const handleDropIt = (pin: Pin) => {
@@ -188,13 +160,7 @@ function PageContent() {
     return () => clearTimeout(t);
   }, [screen, newPin]);
 
-  const handleBackFromCamera = () => {
-    if (cameraStreamRef.current) {
-      cameraStreamRef.current.getTracks().forEach((t) => t.stop());
-      cameraStreamRef.current = null;
-    }
-    setScreen("map");
-  };
+  const handleBackFromCamera = () => setScreen("map");
   const handleBackFromPreview = () => setScreen("camera");
 
   const appContent =
@@ -231,21 +197,11 @@ function PageContent() {
           </div>
         )}
 
-        {screen === "camera-loading" && (
-          <div
-            className="fixed inset-0 bg-black flex items-center justify-center font-mono text-sm text-white/80"
-            style={{ zIndex: 200 }}
-          >
-            Starting camera…
-          </div>
-        )}
-
         {screen === "camera" && (
           <CameraView
             wordEn={dailyWord.word_en}
             onCapture={handlePhotoCaptured}
             onBack={handleBackFromCamera}
-            initialStreamRef={cameraStreamRef}
           />
         )}
 

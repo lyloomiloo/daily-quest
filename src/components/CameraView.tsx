@@ -8,14 +8,12 @@ interface CameraViewProps {
   wordEn: string;
   onCapture: (blob: Blob) => void;
   onBack: () => void;
-  initialStreamRef?: React.MutableRefObject<MediaStream | null>;
 }
 
 export default function CameraView({
   wordEn,
   onCapture,
   onBack,
-  initialStreamRef,
 }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -24,43 +22,47 @@ export default function CameraView({
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
 
   useEffect(() => {
-    const stream = initialStreamRef?.current ?? null;
-    if (stream) {
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      setStreamReady(true);
-      return;
-    }
-    let localStream: MediaStream | null = null;
     const startCamera = async () => {
       try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "environment",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
+        console.log("[CameraView] Requesting camera...");
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
           audio: false,
         });
-        streamRef.current = localStream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = localStream;
+        console.log("[CameraView] Got stream:", stream, "tracks:", stream.getTracks().length);
+
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          streamRef.current = stream;
+          try {
+            await video.play();
+            console.log("[CameraView] Video playing, dimensions:", video.videoWidth, "x", video.videoHeight);
+          } catch (playErr) {
+            console.error("[CameraView] video.play() failed:", playErr);
+          }
+          setStreamReady(true);
+        } else {
+          console.warn("[CameraView] No video ref, stopping stream");
+          stream.getTracks().forEach((t) => t.stop());
         }
-        setStreamReady(true);
-      } catch {
+      } catch (err) {
+        console.error("[CameraView] Camera error:", err);
         setError("Camera access denied or unavailable.");
       }
     };
+
     startCamera();
+
     return () => {
-      if (localStream && streamRef.current === localStream) {
-        localStream.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
+      const s = streamRef.current;
+      if (s) {
+        s.getTracks().forEach((track) => track.stop());
+        console.log("[CameraView] Cleanup: stopped tracks");
       }
+      streamRef.current = null;
     };
-  }, [initialStreamRef]);
+  }, []);
 
   const cropToAspect = useCallback(
     (video: HTMLVideoElement): { sx: number; sy: number; sw: number; sh: number } => {
@@ -75,7 +77,6 @@ export default function CameraView({
           sh: size,
         };
       }
-      // 4:3 (width : height)
       const targetRatio = 4 / 3;
       const currentRatio = vw / vh;
       let sw: number, sh: number, sx: number, sy: number;
@@ -169,42 +170,57 @@ export default function CameraView({
         </div>
       </div>
 
-      <div className="flex-1 relative min-h-0 flex items-center justify-center">
+      <div className="flex-1 relative min-h-0 flex items-center justify-center overflow-hidden">
         {error ? (
           <div className="absolute inset-0 flex items-center justify-center p-4 text-white text-center">
             {error}
           </div>
-        ) : !streamReady ? (
-          <div className="text-white/80 font-mono text-sm">Loading…</div>
         ) : (
-          <div
-            className="relative w-full max-h-full overflow-hidden"
-            style={{
-              aspectRatio: aspectRatio === "1:1" ? "1" : "4/3",
-              maxWidth: aspectRatio === "1:1" ? "min(100vw, 100dvh)" : "100%",
-            }}
-          >
+          <>
+            {/* Video always mounted so ref is set when useEffect runs; explicit size so it's not 0x0 */}
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
               className="absolute inset-0 w-full h-full object-cover"
-              style={{ display: "block" }}
+              style={{
+                width: "100%",
+                height: "100%",
+                minWidth: 1,
+                minHeight: 1,
+                display: "block",
+              }}
             />
-            {/* Rule-of-thirds grid */}
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute left-1/3 top-0 bottom-0 w-px bg-[#666] opacity-60" />
-              <div className="absolute left-2/3 top-0 bottom-0 w-px bg-[#666] opacity-60" />
-              <div className="absolute top-1/3 left-0 right-0 h-px bg-[#666] opacity-60" />
-              <div className="absolute top-2/3 left-0 right-0 h-px bg-[#666] opacity-60" />
-            </div>
-            {/* Corner brackets */}
-            <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-white rounded-tl" />
-            <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-white rounded-tr" />
-            <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-white rounded-bl" />
-            <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-white rounded-br" />
-          </div>
+            {!streamReady && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/60 font-mono text-sm text-white/80">
+                Loading…
+              </div>
+            )}
+            {streamReady && (
+              <>
+                <div
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                  style={{
+                    aspectRatio: aspectRatio === "1:1" ? "1" : "4/3",
+                    maxWidth: "100%",
+                    maxHeight: "100%",
+                  }}
+                >
+                  <div className="relative w-full h-full">
+                    <div className="absolute left-1/3 top-0 bottom-0 w-px bg-[#666] opacity-60" />
+                    <div className="absolute left-2/3 top-0 bottom-0 w-px bg-[#666] opacity-60" />
+                    <div className="absolute top-1/3 left-0 right-0 h-px bg-[#666] opacity-60" />
+                    <div className="absolute top-2/3 left-0 right-0 h-px bg-[#666] opacity-60" />
+                  </div>
+                </div>
+                <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-white rounded-tl pointer-events-none" />
+                <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-white rounded-tr pointer-events-none" />
+                <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-white rounded-bl pointer-events-none" />
+                <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-white rounded-br pointer-events-none" />
+              </>
+            )}
+          </>
         )}
       </div>
 
