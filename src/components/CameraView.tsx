@@ -20,7 +20,6 @@ export default function CameraView({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
-  const exposureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [streamReady, setStreamReady] = useState(false);
@@ -33,9 +32,6 @@ export default function CameraView({
   const [exposureMin, setExposureMin] = useState(0);
   const [exposureMax, setExposureMax] = useState(0);
   const [supportsExposure, setSupportsExposure] = useState(false);
-
-  const availableZoomPresets = ZOOM_PRESETS.filter((z) => z >= zoomMin && z <= zoomMax);
-  const hasMultipleZoom = availableZoomPresets.length > 1;
 
   useEffect(() => {
     const startCamera = async () => {
@@ -112,6 +108,9 @@ export default function CameraView({
     };
   }, []);
 
+  const availableZoomPresets = ZOOM_PRESETS.filter((z) => z >= zoomMin && z <= zoomMax);
+  const hasMultipleZoom = availableZoomPresets.length > 1;
+
   const setZoomPresetAndApply = useCallback(
     (preset: number) => {
       const clamped = Math.max(zoomMin, Math.min(zoomMax, preset));
@@ -125,26 +124,12 @@ export default function CameraView({
   );
 
   const applyExposure = useCallback((value: number) => {
+    const track = videoTrackRef.current;
+    if (!track) return;
     const clamped = Math.max(exposureMin, Math.min(exposureMax, value));
     setExposureCompensation(clamped);
-    if (exposureTimeoutRef.current) clearTimeout(exposureTimeoutRef.current);
-    exposureTimeoutRef.current = setTimeout(() => {
-      exposureTimeoutRef.current = null;
-      const track = videoTrackRef.current;
-      if (track) {
-        track.applyConstraints({ exposureCompensation: clamped } as MediaTrackConstraints).catch(() => {});
-      }
-    }, 150);
+    track.applyConstraints({ exposureCompensation: clamped } as MediaTrackConstraints).catch(() => {});
   }, [exposureMin, exposureMax]);
-
-  useEffect(() => {
-    return () => {
-      if (exposureTimeoutRef.current) {
-        clearTimeout(exposureTimeoutRef.current);
-        exposureTimeoutRef.current = null;
-      }
-    };
-  }, []);
 
   // Crop region in video coords: 1:1 = square, 4:3 = portrait (3 wide, 4 tall → width/height = 3/4)
   const cropToAspect = useCallback(
@@ -269,68 +254,43 @@ export default function CameraView({
                   <div className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 border-white rounded-tr" />
                   <div className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 border-white rounded-bl" />
                   <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-white rounded-br" />
-                  {/* FIND AND FRAME inside viewfinder, centered near bottom */}
+                  {/* FIND AND FRAME inside viewfinder, centered near bottom — within frame for both 1:1 and 4:3 */}
                   <div className="absolute left-0 right-0 bottom-4 flex justify-center pointer-events-none">
                     <span className="font-mono text-xs uppercase tracking-wider text-white bg-black/60 px-3 py-1.5" style={{ borderRadius: 0 }}>
                       FIND AND FRAME &quot;{wordEn}&quot;
                     </span>
                   </div>
-                  {/* Exposure: vertical dial on right edge of viewfinder, only if supported */}
-                  {supportsExposure && (
-                    <div
-                      className="absolute top-1/2 -translate-y-1/2 right-2 flex flex-col items-center gap-0 py-2 px-1.5 bg-black/50"
-                      style={{ borderRadius: 0 }}
-                    >
-                      <span className="text-white/90" aria-hidden>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-                      </span>
-                      <input
-                        type="range"
-                        min={exposureMin}
-                        max={exposureMax}
-                        step={0.1}
-                        value={exposureCompensation}
-                        onChange={(e) => applyExposure(Number(e.target.value))}
-                        className="w-14 h-1.5 accent-white bg-white/30"
-                        style={{ transform: "rotate(-90deg)", margin: "4px 0" }}
-                      />
-                      <span className="text-white/70" aria-hidden>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                      </span>
-                    </div>
-                  )}
                 </>
               )}
             </div>
 
-            {/* Toggles below frame: bottom-right, aspect ratio + zoom side by side */}
-            <div className="absolute bottom-3 right-3 flex items-center gap-2">
-              <div className="flex items-stretch font-mono text-xs uppercase tracking-wider overflow-hidden border-2 border-black bg-white" style={{ borderRadius: 0 }}>
-                <button
-                  type="button"
-                  onClick={() => setAspectRatio("4:3")}
-                  className={`px-2 py-1.5 border-r-2 border-black ${aspectRatio === "4:3" ? "bg-black text-white" : "bg-white text-black"}`}
-                  style={{ borderRadius: 0 }}
-                >
-                  4:3
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAspectRatio("1:1")}
-                  className={`px-2 py-1.5 ${aspectRatio === "1:1" ? "bg-black text-white" : "bg-white text-black"}`}
-                  style={{ borderRadius: 0 }}
-                >
-                  1:1
-                </button>
+            {/* Exposure slider (only if device supports it) — left edge */}
+            {supportsExposure && streamReady && (
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 py-2 px-1.5 bg-black/50" style={{ borderRadius: 0 }}>
+                <span className="font-mono text-[10px] text-white/80 uppercase">Exp</span>
+                <input
+                  type="range"
+                  min={exposureMin}
+                  max={exposureMax}
+                  step={0.1}
+                  value={exposureCompensation}
+                  onChange={(e) => applyExposure(Number(e.target.value))}
+                  className="w-14 h-1.5 accent-white bg-white/30"
+                  style={{ transform: "rotate(-90deg)", margin: "4px 0" }}
+                />
               </div>
+            )}
+
+            {/* Below frame (black area): bottom-right — zoom above aspect ratio, same width, small gap */}
+            <div className="absolute bottom-3 right-3 flex flex-col items-end gap-2">
               {hasMultipleZoom && (
-                <div className="flex items-stretch font-mono text-xs uppercase tracking-wider overflow-hidden border-2 border-black bg-white" style={{ borderRadius: 0 }}>
+                <div className="flex items-stretch font-mono text-xs uppercase tracking-wider overflow-hidden border-2 border-black bg-white min-w-[7.5rem]" style={{ borderRadius: 0 }}>
                   {availableZoomPresets.map((preset) => (
                     <button
                       key={preset}
                       type="button"
                       onClick={() => setZoomPresetAndApply(preset)}
-                      className={`px-2 py-1.5 border-r-2 border-black last:border-r-0 ${
+                      className={`flex-1 px-2 py-1.5 border-r-2 border-black last:border-r-0 ${
                         zoomPreset === preset ? "bg-black text-white" : "bg-white text-black"
                       }`}
                       style={{ borderRadius: 0 }}
@@ -340,12 +300,34 @@ export default function CameraView({
                   ))}
                 </div>
               )}
+              <div className="flex items-stretch font-mono text-xs uppercase tracking-wider overflow-hidden border-2 border-black bg-white min-w-[7.5rem]" style={{ borderRadius: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setAspectRatio("4:3")}
+                  className={`flex-1 px-2 py-1.5 border-r-2 border-black ${
+                    aspectRatio === "4:3" ? "bg-black text-white" : "bg-white text-black"
+                  }`}
+                  style={{ borderRadius: 0 }}
+                >
+                  4:3
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAspectRatio("1:1")}
+                  className={`flex-1 px-2 py-1.5 ${
+                    aspectRatio === "1:1" ? "bg-black text-white" : "bg-white text-black"
+                  }`}
+                  style={{ borderRadius: 0 }}
+                >
+                  1:1
+                </button>
+              </div>
             </div>
           </>
         )}
       </div>
 
-      <div className="px-4 pb-4 pt-2 flex flex-col items-center gap-4 shrink-0">
+      <div className="px-4 pb-4 pt-2 flex flex-col items-center shrink-0">
         <button
           type="button"
           onClick={capture}

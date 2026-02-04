@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { LatLngExpression } from "leaflet";
@@ -18,8 +18,12 @@ function MapCenterUpdater({
   zoom: number;
 }) {
   const map = useMap();
+  const setViewCountRef = useRef(0);
   useEffect(() => {
-    map.setView(center, zoom);
+    if (setViewCountRef.current < 2) {
+      map.setView(center, zoom);
+      setViewCountRef.current += 1;
+    }
   }, [map, center, zoom]);
   return null;
 }

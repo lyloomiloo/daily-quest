@@ -173,7 +173,7 @@ function PageContent() {
     ) : (
       <PhoneFrame>
       <div className="relative h-full min-h-0" style={{ minHeight: "100dvh" }}>
-        {screen === "map" && (
+        {(screen === "map" || screen === "lightbox") && (
           <div className="flex flex-col h-full" style={{ minHeight: "100dvh" }}>
             <div className="shrink-0 z-[100] border-b-[4px] border-black">
               <Header dateStr={dateStr} countdown={countdown} />
