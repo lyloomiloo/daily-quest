@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const STORAGE_KEY_ALLOWED = "daily-quest-location-allowed";
 const STORAGE_KEY_SKIPPED = "daily-quest-location-skipped";
@@ -17,10 +17,10 @@ export default function LocationGate({ onReady, children }: LocationGateProps) {
   const [status, setStatus] = useState<GateStatus>("checking");
   const [requesting, setRequesting] = useState(false);
 
-  const markReady = () => {
+  const markReady = useCallback(() => {
     setReady(true);
     onReady?.();
-  };
+  }, [onReady]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -44,7 +44,7 @@ export default function LocationGate({ onReady, children }: LocationGateProps) {
       () => setStatus("prompt"),
       { maximumAge: 60000, timeout: 2000 }
     );
-  }, []);
+  }, [markReady]);
 
   const handleAllow = () => {
     if (typeof window === "undefined" || !window.navigator?.geolocation) return;
