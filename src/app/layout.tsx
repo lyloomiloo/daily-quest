@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   description: "A photo a day.",
   applicationName: "snapp",
   themeColor: "#000000",
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     title: "snapp",
