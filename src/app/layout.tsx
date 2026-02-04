@@ -7,7 +7,13 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 export const metadata: Metadata = {
   title: "snapp",
   description: "A photo a day.",
-  manifest: "/manifest.json",
+  applicationName: "snapp",
+  themeColor: "#000000",
+  appleWebApp: {
+    capable: true,
+    title: "snapp",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
