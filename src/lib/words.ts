@@ -42,6 +42,15 @@ export function setCachedWord(today: string, word: DailyWord): void {
 /** YYYY-MM-DD regex for validation */
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+type WordRecord = {
+  id: number;
+  word_en: string;
+  word_es: string;
+  active_date: string | null;
+  times_used?: number;
+  last_used_date?: string | null;
+};
+
 /** Day of year 1–366 for a YYYY-MM-DD date string (deterministic word selection). */
 function getDayOfYear(today: string): number {
   const [y, m, d] = today.split("-").map(Number);
@@ -95,7 +104,7 @@ export async function getDailyWord(todayOverride?: string): Promise<DailyWord> {
   // Step 2: No word for today — assign one with smart repetition rules
   const dayOfYear = getDayOfYear(today);
 
-  let candidates: { id: number; word_en: string; word_es: string; active_date: string | null; times_used?: number; last_used_date?: string | null }[] | null = null;
+  let candidates: WordRecord[] | null = null;
   let useSmartRepetition = false;
 
   const { data: allWords } = await client.from("words").select("times_used");
@@ -115,7 +124,7 @@ export async function getDailyWord(todayOverride?: string): Promise<DailyWord> {
     .order("id", { ascending: true });
 
   if (!smartResult.error && smartResult.data?.length) {
-    candidates = smartResult.data as typeof candidates;
+    candidates = smartResult.data as WordRecord[];
     useSmartRepetition = true;
   }
 
@@ -128,7 +137,7 @@ export async function getDailyWord(todayOverride?: string): Promise<DailyWord> {
     if (legacyResult.error || !legacyResult.data?.length) {
       return getFallbackWord(today);
     }
-    candidates = legacyResult.data as typeof candidates;
+    candidates = legacyResult.data as WordRecord[];
   }
 
   const chosenIndex = dayOfYear % candidates!.length;
