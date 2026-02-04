@@ -117,7 +117,7 @@ export default function CameraView({
     if (!track) return;
     const clamped = Math.max(zoomMin, Math.min(zoomMax, value));
     setZoomLevel(clamped);
-    track.applyConstraints({ zoom: clamped }).catch(() => {});
+    track.applyConstraints({ zoom: clamped } as MediaTrackConstraints).catch(() => {});
   }, [zoomMin, zoomMax]);
 
   const applyExposure = useCallback((value: number) => {
@@ -125,7 +125,7 @@ export default function CameraView({
     if (!track) return;
     const clamped = Math.max(exposureMin, Math.min(exposureMax, value));
     setExposureCompensation(clamped);
-    track.applyConstraints({ exposureCompensation: clamped }).catch(() => {});
+    track.applyConstraints({ exposureCompensation: clamped } as MediaTrackConstraints).catch(() => {});
   }, [exposureMin, exposureMax]);
 
   useEffect(() => {
