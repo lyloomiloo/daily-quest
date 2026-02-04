@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Daily Quest",
-  description: "Location-based photo discovery game",
+  title: "snapp",
+  description: "A photo a day.",
   manifest: "/manifest.json",
 };
 
