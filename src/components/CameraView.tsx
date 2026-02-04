@@ -56,7 +56,7 @@ export default function CameraView({
           if (videoTrack) {
             const caps = videoTrack.getCapabilities() as Record<string, { min?: number; max?: number; step?: number }>;
             const settings = videoTrack.getSettings() as Record<string, number | undefined>;
-            const supported = navigator.mediaDevices.getSupportedConstraints?.() ?? {};
+            const supported = (navigator.mediaDevices.getSupportedConstraints?.() ?? {}) as Record<string, boolean>;
             if (supported.zoom && typeof caps.zoom === "object" && caps.zoom.min != null && caps.zoom.max != null) {
               const min = caps.zoom.min;
               const max = caps.zoom.max;
