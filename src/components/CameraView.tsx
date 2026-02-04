@@ -225,15 +225,15 @@ export default function CameraView({
                       <div className="absolute top-1/3 left-0 right-0 h-px bg-[#666] opacity-50" />
                       <div className="absolute top-2/3 left-0 right-0 h-px bg-[#666] opacity-50" />
                     </div>
-                    {/* Corner brackets */}
-                    <div className="absolute top-2 left-2 w-6 h-6 border-t-2 border-l-2 border-white" />
-                    <div className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 border-white" />
-                    <div className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 border-white" />
-                    <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-white" />
-                    {/* FIND AND FRAME: bottom third gridline (1/3 from bottom = 2/3 from top) */}
+                    {/* Corner brackets — 50% transparent, rounder, inset further from corners */}
+                    <div className="absolute top-6 left-6 w-7 h-7 border-t-2 border-l-2 border-white opacity-50 rounded-tl-lg" />
+                    <div className="absolute top-6 right-6 w-7 h-7 border-t-2 border-r-2 border-white opacity-50 rounded-tr-lg" />
+                    <div className="absolute bottom-6 left-6 w-7 h-7 border-b-2 border-l-2 border-white opacity-50 rounded-bl-lg" />
+                    <div className="absolute bottom-6 right-6 w-7 h-7 border-b-2 border-r-2 border-white opacity-50 rounded-br-lg" />
+                    {/* FIND AND FRAME: 80% down the frame */}
                     <div
                       className="absolute left-0 right-0 flex justify-center pointer-events-none"
-                      style={{ top: "66.67%" }}
+                      style={{ top: "80%" }}
                     >
                       <span
                         className="font-mono uppercase text-white"
