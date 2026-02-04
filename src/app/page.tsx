@@ -21,9 +21,13 @@ import {
 import { fetchPinsForDate } from "@/lib/pins";
 import { getDailyWord, getCachedWord, setCachedWord } from "@/lib/words";
 
+const BARCELONA_CENTER: [number, number] = [41.3874, 2.1686];
+const DEFAULT_ZOOM = 15;
+
 type Screen =
   | "map"
   | "lightbox"
+  | "camera-loading"
   | "camera"
   | "preview"
   | "upload-confirm";
@@ -45,6 +49,8 @@ function PageContent() {
   const [screen, setScreen] = useState<Screen>("map");
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [newPin, setNewPin] = useState<Pin | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
 
   const [dailyWord, setDailyWord] = useState<DailyWord | null>(null);
   const wordFetchRef = useRef<{ date: string; promise: Promise<DailyWord> } | null>(null);
@@ -77,6 +83,47 @@ function PageContent() {
     const interval = setInterval(update, 60 * 1000);
     return () => clearInterval(interval);
   }, [testDate]);
+
+  // Request user location immediately on load for map center; fallback to Barcelona if denied/unavailable
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.navigator?.geolocation) return;
+    window.navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+          setMapCenter([latitude, longitude]);
+        }
+      },
+      () => setMapCenter(BARCELONA_CENTER),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }, []);
+
+  // Preload camera stream when user taps SNAPP (camera-loading); show camera only when stream is ready
+  useEffect(() => {
+    if (screen !== "camera-loading") return;
+    let cancelled = false;
+    const start = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        cameraStreamRef.current = stream;
+        setScreen("camera");
+      } catch {
+        if (!cancelled) setScreen("map");
+      }
+    };
+    start();
+    return () => {
+      cancelled = true;
+    };
+  }, [screen]);
 
   // Single source of truth: fetch word ONCE per todayForFetch (cache first, then one getDailyWord call)
   useEffect(() => {
@@ -113,7 +160,7 @@ function PageContent() {
   };
 
   const handleCaptureClick = () => {
-    setScreen("camera");
+    setScreen("camera-loading");
   };
 
   const handlePhotoCaptured = (blob: Blob) => {
@@ -123,7 +170,7 @@ function PageContent() {
 
   const handleRetake = () => {
     setCapturedBlob(null);
-    setScreen("camera");
+    setScreen("camera-loading");
   };
 
   const handleDropIt = (pin: Pin) => {
@@ -141,7 +188,13 @@ function PageContent() {
     return () => clearTimeout(t);
   }, [screen, newPin]);
 
-  const handleBackFromCamera = () => setScreen("map");
+  const handleBackFromCamera = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((t) => t.stop());
+      cameraStreamRef.current = null;
+    }
+    setScreen("map");
+  };
   const handleBackFromPreview = () => setScreen("camera");
 
   const appContent =
@@ -164,11 +217,26 @@ function PageContent() {
               />
             </div>
             <div className="flex-1 min-h-0 relative z-[1]">
-              <MapView pins={pins} onPinClick={handlePinClick} newPinId={newPin?.id ?? null} />
+              <MapView
+                center={mapCenter ?? BARCELONA_CENTER}
+                zoom={DEFAULT_ZOOM}
+                pins={pins}
+                onPinClick={handlePinClick}
+                newPinId={newPin?.id ?? null}
+              />
             </div>
             <div className="shrink-0">
               <CaptureButton onClick={handleCaptureClick} />
             </div>
+          </div>
+        )}
+
+        {screen === "camera-loading" && (
+          <div
+            className="fixed inset-0 bg-black flex items-center justify-center font-mono text-sm text-white/80"
+            style={{ zIndex: 200 }}
+          >
+            Starting camera…
           </div>
         )}
 
@@ -177,6 +245,7 @@ function PageContent() {
             wordEn={dailyWord.word_en}
             onCapture={handlePhotoCaptured}
             onBack={handleBackFromCamera}
+            initialStreamRef={cameraStreamRef}
           />
         )}
 

@@ -1,9 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { LatLngExpression } from "leaflet";
+
+function MapCenterUpdater({
+  center,
+  zoom,
+}: {
+  center: LatLngExpression;
+  zoom: number;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, zoom);
+  }, [map, center, zoom]);
+  return null;
+}
 import type { Pin } from "@/lib/data";
 import {
   GEOLOCATION_OPTIONS,
@@ -109,6 +123,7 @@ export default function MapViewClient({
         style={{ zIndex: 1 }}
         zoomControl={false}
       >
+        <MapCenterUpdater center={center} zoom={zoom} />
         <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
         {userPosition && (
         <Marker
