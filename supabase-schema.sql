@@ -4,12 +4,14 @@
 -- Enable UUID extension if not already
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Daily words
+-- Daily words (active_date nullable = unassigned; run supabase-migration-words-repetition.sql for existing DBs)
 CREATE TABLE words (
   id SERIAL PRIMARY KEY,
   word_en TEXT NOT NULL,
   word_es TEXT NOT NULL,
-  active_date DATE UNIQUE NOT NULL
+  active_date DATE,
+  times_used INTEGER NOT NULL DEFAULT 0,
+  last_used_date DATE
 );
 
 -- Photo pins

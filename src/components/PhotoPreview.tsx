@@ -12,9 +12,17 @@ interface PhotoPreviewProps {
   onBack: () => void;
 }
 
-// Mock Barcelona center for new pin when we don't have geolocation yet
-const FALLBACK_LAT = 41.3874;
-const FALLBACK_LNG = 2.1686;
+// Barcelona bounds for random placement when user has no GPS
+const BARCELONA_LAT_MIN = 41.35;
+const BARCELONA_LAT_MAX = 41.45;
+const BARCELONA_LNG_MIN = 2.1;
+const BARCELONA_LNG_MAX = 2.23;
+
+function randomBarcelonaCoords(): { lat: number; lng: number } {
+  const lat = BARCELONA_LAT_MIN + Math.random() * (BARCELONA_LAT_MAX - BARCELONA_LAT_MIN);
+  const lng = BARCELONA_LNG_MIN + Math.random() * (BARCELONA_LNG_MAX - BARCELONA_LNG_MIN);
+  return { lat, lng };
+}
 
 export default function PhotoPreview({
   blob,
@@ -31,8 +39,9 @@ export default function PhotoPreview({
     setUploading(true);
     setError(null);
     try {
-      let lat = FALLBACK_LAT;
-      let lng = FALLBACK_LNG;
+      const { lat: fallbackLat, lng: fallbackLng } = randomBarcelonaCoords();
+      let lat = fallbackLat;
+      let lng = fallbackLng;
       let streetName: string | null = null;
 
       if (navigator.geolocation) {

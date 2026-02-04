@@ -81,8 +81,6 @@ export async function getDailyWord(todayOverride?: string): Promise<DailyWord> {
     .maybeSingle();
 
   if (!todayError && existingWord) {
-    console.log("Word fetched:", existingWord.word_en);
-    console.log("active_date in DB:", existingWord.active_date);
     return {
       word_en: existingWord.word_en,
       word_es: existingWord.word_es,
@@ -94,34 +92,48 @@ export async function getDailyWord(todayOverride?: string): Promise<DailyWord> {
     console.error("Supabase words fetch (today) failed:", todayError);
   }
 
-  // Step 2: No word for today — assign one using deterministic selection (same date = same word for everyone)
+  // Step 2: No word for today — assign one with smart repetition rules
   const dayOfYear = getDayOfYear(today);
 
-  const { data: candidates, error: listError } = await client
+  let candidates: { id: number; word_en: string; word_es: string; active_date: string | null; times_used?: number; last_used_date?: string | null }[] | null = null;
+  let useSmartRepetition = false;
+
+  const { data: allWords } = await client.from("words").select("times_used");
+  const totalUses = allWords?.reduce((s, r) => s + (Number((r as { times_used?: number }).times_used) || 0), 0) ?? 0;
+  const maxPerWord = Math.max(1, Math.floor(0.3 * (totalUses + 1)));
+
+  const thirtyDaysAgo = new Date(today + "T12:00:00Z");
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().slice(0, 10);
+
+  const smartResult = await client
     .from("words")
-    .select("id, word_en, word_es, active_date")
-    .is("active_date", null)
+    .select("id, word_en, word_es, active_date, times_used, last_used_date")
+    .or(`active_date.is.null,last_used_date.is.null,last_used_date.lt.${thirtyDaysAgoStr}`)
+    .lt("times_used", maxPerWord)
+    .order("times_used", { ascending: true })
     .order("id", { ascending: true });
 
-  if (listError) {
-    console.error("Supabase words fetch (candidates) failed:", listError);
-    const fallback = getFallbackWord(today);
-    console.log("Word fetched:", fallback.word_en, "(fallback – query error)");
-    console.log("active_date in DB: N/A (fallback)");
-    return fallback;
+  if (!smartResult.error && smartResult.data?.length) {
+    candidates = smartResult.data as typeof candidates;
+    useSmartRepetition = true;
   }
 
   if (!candidates?.length) {
-    const fallback = getFallbackWord(today);
-    console.log("Word fetched:", fallback.word_en, "(fallback – no NULL words)");
-    console.log("active_date in DB: N/A (fallback)");
-    return fallback;
+    const legacyResult = await client
+      .from("words")
+      .select("id, word_en, word_es, active_date")
+      .is("active_date", null)
+      .order("id", { ascending: true });
+    if (legacyResult.error || !legacyResult.data?.length) {
+      return getFallbackWord(today);
+    }
+    candidates = legacyResult.data as typeof candidates;
   }
 
-  const chosenIndex = dayOfYear % candidates.length;
-  const chosen = candidates[chosenIndex];
+  const chosenIndex = dayOfYear % candidates!.length;
+  const chosen = candidates![chosenIndex];
 
-  // Safeguard: re-check that no word was assigned in the meantime (another client may have assigned)
   const { data: recheckRow, error: recheckError } = await client
     .from("words")
     .select("id, word_en, word_es, active_date")
@@ -129,8 +141,6 @@ export async function getDailyWord(todayOverride?: string): Promise<DailyWord> {
     .maybeSingle();
 
   if (!recheckError && recheckRow) {
-    console.log("Word fetched:", recheckRow.word_en, "(another client assigned; using same)");
-    console.log("active_date in DB:", recheckRow.active_date);
     return {
       word_en: recheckRow.word_en,
       word_es: recheckRow.word_es,
@@ -138,21 +148,21 @@ export async function getDailyWord(todayOverride?: string): Promise<DailyWord> {
     };
   }
 
-  const { error: updateError } = await client
-    .from("words")
-    .update({ active_date: today })
-    .eq("id", chosen.id);
+  const updatePayload = useSmartRepetition
+    ? {
+        active_date: today,
+        last_used_date: today,
+        times_used: (Number(chosen.times_used) || 0) + 1,
+      }
+    : { active_date: today };
+
+  const { error: updateError } = await client.from("words").update(updatePayload).eq("id", chosen.id);
 
   if (updateError) {
     console.error("Supabase words update failed:", updateError);
-    const fallback = getFallbackWord(today);
-    console.log("Word fetched:", fallback.word_en, "(fallback – update error)");
-    console.log("active_date in DB: N/A (fallback)");
-    return fallback;
+    return getFallbackWord(today);
   }
 
-  console.log("Word fetched:", chosen.word_en, "(assigned deterministically)");
-  console.log("active_date in DB:", today);
   return {
     word_en: chosen.word_en,
     word_es: chosen.word_es,

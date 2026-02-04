@@ -28,10 +28,6 @@ export default function CameraView({
   const [zoomMin, setZoomMin] = useState(1);
   const [zoomMax, setZoomMax] = useState(1);
   const [supportsZoom, setSupportsZoom] = useState(false);
-  const [exposureCompensation, setExposureCompensation] = useState(0);
-  const [exposureMin, setExposureMin] = useState(0);
-  const [exposureMax, setExposureMax] = useState(0);
-  const [supportsExposure, setSupportsExposure] = useState(false);
 
   useEffect(() => {
     const startCamera = async () => {
@@ -65,20 +61,6 @@ export default function CameraView({
               setZoomPreset(initial);
               setSupportsZoom(max > min);
               videoTrack.applyConstraints({ zoom: initial } as MediaTrackConstraints).catch(() => {});
-            }
-            if (
-              supported.exposureCompensation &&
-              typeof caps.exposureCompensation === "object" &&
-              caps.exposureCompensation.min != null &&
-              caps.exposureCompensation.max != null
-            ) {
-              setExposureMin(caps.exposureCompensation.min);
-              setExposureMax(caps.exposureCompensation.max);
-              const current = settings.exposureCompensation;
-              setExposureCompensation(
-                typeof current === "number" ? current : caps.exposureCompensation.min
-              );
-              setSupportsExposure(caps.exposureCompensation.max !== caps.exposureCompensation.min);
             }
           }
 
@@ -122,14 +104,6 @@ export default function CameraView({
     },
     [zoomMin, zoomMax]
   );
-
-  const applyExposure = useCallback((value: number) => {
-    const track = videoTrackRef.current;
-    if (!track) return;
-    const clamped = Math.max(exposureMin, Math.min(exposureMax, value));
-    setExposureCompensation(clamped);
-    track.applyConstraints({ exposureCompensation: clamped } as MediaTrackConstraints).catch(() => {});
-  }, [exposureMin, exposureMax]);
 
   // Crop region in video coords: 1:1 = square, 4:3 = portrait (3 wide, 4 tall → width/height = 3/4)
   const cropToAspect = useCallback(
@@ -254,12 +228,19 @@ export default function CameraView({
                   <div className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 border-white rounded-tr" />
                   <div className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 border-white rounded-bl" />
                   <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-white rounded-br" />
-                  {/* FIND AND FRAME: middle of bottom third of grid, no background */}
+                  {/* FIND AND FRAME: bottom center of frame, ~20px from bottom */}
                   <div
-                    className="absolute left-0 right-0 flex justify-center pointer-events-none -translate-y-1/2"
-                    style={{ top: "83.33%" }}
+                    className="absolute left-0 right-0 flex justify-center pointer-events-none"
+                    style={{ bottom: 20 }}
                   >
-                    <span className="font-mono text-xs uppercase tracking-wider text-white">
+                    <span
+                      className="font-mono uppercase text-white"
+                      style={{
+                        fontSize: "11px",
+                        letterSpacing: "0.1em",
+                        opacity: 0.7,
+                      }}
+                    >
                       FIND AND FRAME &quot;{wordEn}&quot;
                     </span>
                   </div>
@@ -267,64 +248,51 @@ export default function CameraView({
               )}
             </div>
 
-            {/* Exposure slider (only if device supports it) — left edge */}
-            {supportsExposure && streamReady && (
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 py-2 px-1.5 bg-black/50" style={{ borderRadius: 0 }}>
-                <span className="font-mono text-[10px] text-white/80 uppercase">Exp</span>
-                <input
-                  type="range"
-                  min={exposureMin}
-                  max={exposureMax}
-                  step={0.1}
-                  value={exposureCompensation}
-                  onChange={(e) => applyExposure(Number(e.target.value))}
-                  className="w-14 h-1.5 accent-white bg-white/30"
-                  style={{ transform: "rotate(-90deg)", margin: "4px 0" }}
-                />
+            {/* Below viewfinder (black area): zoom centered, ratio far right, then shutter below */}
+            {hasMultipleZoom && (
+              <div
+                className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 font-mono"
+                style={{ bottom: 88, fontSize: "12px" }}
+              >
+                {availableZoomPresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setZoomPresetAndApply(preset)}
+                    className={`px-2 py-1 ${
+                      zoomPreset === preset ? "bg-[#000] text-[#FFF]" : "text-white"
+                    }`}
+                    style={{ borderRadius: 0 }}
+                  >
+                    {preset}x
+                  </button>
+                ))}
               </div>
             )}
-
-            {/* Below frame (black area): bottom-right — zoom above aspect ratio, same width, small gap */}
-            <div className="absolute bottom-3 right-3 flex flex-col items-end gap-2">
-              {hasMultipleZoom && (
-                <div className="flex items-stretch font-mono text-xs uppercase tracking-wider overflow-hidden border-2 border-black bg-white min-w-[7.5rem]" style={{ borderRadius: 0 }}>
-                  {availableZoomPresets.map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setZoomPresetAndApply(preset)}
-                      className={`flex-1 px-2 py-1.5 border-r-2 border-black last:border-r-0 ${
-                        zoomPreset === preset ? "bg-black text-white" : "bg-white text-black"
-                      }`}
-                      style={{ borderRadius: 0 }}
-                    >
-                      {preset}x
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="flex items-stretch font-mono text-xs uppercase tracking-wider overflow-hidden border-2 border-black bg-white min-w-[7.5rem]" style={{ borderRadius: 0 }}>
-                <button
-                  type="button"
-                  onClick={() => setAspectRatio("4:3")}
-                  className={`flex-1 px-2 py-1.5 border-r-2 border-black ${
-                    aspectRatio === "4:3" ? "bg-black text-white" : "bg-white text-black"
-                  }`}
-                  style={{ borderRadius: 0 }}
-                >
-                  4:3
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAspectRatio("1:1")}
-                  className={`flex-1 px-2 py-1.5 ${
-                    aspectRatio === "1:1" ? "bg-black text-white" : "bg-white text-black"
-                  }`}
-                  style={{ borderRadius: 0 }}
-                >
-                  1:1
-                </button>
-              </div>
+            <div
+              className="absolute right-4 flex flex-col gap-0 font-mono"
+              style={{ bottom: 88, fontSize: "12px" }}
+            >
+              <button
+                type="button"
+                onClick={() => setAspectRatio("4:3")}
+                className={`w-10 h-8 flex items-center justify-center uppercase ${
+                  aspectRatio === "4:3" ? "bg-[#000] text-[#FFF]" : "text-white"
+                }`}
+                style={{ borderRadius: 0 }}
+              >
+                4:3
+              </button>
+              <button
+                type="button"
+                onClick={() => setAspectRatio("1:1")}
+                className={`w-10 h-8 flex items-center justify-center uppercase ${
+                  aspectRatio === "1:1" ? "bg-[#000] text-[#FFF]" : "text-white"
+                }`}
+                style={{ borderRadius: 0 }}
+              >
+                1:1
+              </button>
             </div>
           </>
         )}
