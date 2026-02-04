@@ -225,11 +225,11 @@ export default function CameraView({
                       <div className="absolute top-1/3 left-0 right-0 h-px bg-[#666] opacity-50" />
                       <div className="absolute top-2/3 left-0 right-0 h-px bg-[#666] opacity-50" />
                     </div>
-                    {/* Corner brackets — 50% transparent, subtle round, inset from corners */}
-                    <div className="absolute top-3 left-3 w-7 h-7 border-t-2 border-l-2 border-white opacity-50 rounded-tl-[4px]" />
-                    <div className="absolute top-3 right-3 w-7 h-7 border-t-2 border-r-2 border-white opacity-50 rounded-tr-[4px]" />
-                    <div className="absolute bottom-3 left-3 w-7 h-7 border-b-2 border-l-2 border-white opacity-50 rounded-bl-[4px]" />
-                    <div className="absolute bottom-3 right-3 w-7 h-7 border-b-2 border-r-2 border-white opacity-50 rounded-br-[4px]" />
+                    {/* Corner brackets — 1px, sharp, 50% transparent, inset from corners */}
+                    <div className="absolute top-3 left-3 w-7 h-7 border-t border-l border-white opacity-50" />
+                    <div className="absolute top-3 right-3 w-7 h-7 border-t border-r border-white opacity-50" />
+                    <div className="absolute bottom-3 left-3 w-7 h-7 border-b border-l border-white opacity-50" />
+                    <div className="absolute bottom-3 right-3 w-7 h-7 border-b border-r border-white opacity-50" />
                     {/* FIND AND FRAME: 80% down the frame */}
                     <div
                       className="absolute left-0 right-0 flex justify-center pointer-events-none"
