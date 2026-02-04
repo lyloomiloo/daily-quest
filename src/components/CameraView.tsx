@@ -254,9 +254,12 @@ export default function CameraView({
                   <div className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 border-white rounded-tr" />
                   <div className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 border-white rounded-bl" />
                   <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-white rounded-br" />
-                  {/* FIND AND FRAME inside viewfinder, centered near bottom — within frame for both 1:1 and 4:3 */}
-                  <div className="absolute left-0 right-0 bottom-4 flex justify-center pointer-events-none">
-                    <span className="font-mono text-xs uppercase tracking-wider text-white bg-black/60 px-3 py-1.5" style={{ borderRadius: 0 }}>
+                  {/* FIND AND FRAME: middle of bottom third of grid, no background */}
+                  <div
+                    className="absolute left-0 right-0 flex justify-center pointer-events-none -translate-y-1/2"
+                    style={{ top: "83.33%" }}
+                  >
+                    <span className="font-mono text-xs uppercase tracking-wider text-white">
                       FIND AND FRAME &quot;{wordEn}&quot;
                     </span>
                   </div>
