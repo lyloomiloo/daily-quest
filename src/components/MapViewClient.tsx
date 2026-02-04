@@ -53,35 +53,6 @@ function MapZoomControls() {
   );
 }
 
-function CompassIndicator() {
-  const [heading, setHeading] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.DeviceOrientationEvent) return;
-    const handleOrientation = (e: DeviceOrientationEvent) => {
-      if (e.alpha != null && !isNaN(e.alpha)) setHeading(e.alpha);
-    };
-    window.addEventListener("deviceorientation", handleOrientation);
-    return () => window.removeEventListener("deviceorientation", handleOrientation);
-  }, []);
-
-  // alpha = 0 is North; rotate so N points north (rotation = -alpha)
-  const rotation = heading != null ? -heading : 0;
-
-  return (
-    <div
-      className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center bg-white border-2 border-black z-[400] font-mono text-xs font-bold text-black pointer-events-none"
-      style={{
-        borderRadius: 0,
-        transform: `rotate(${rotation}deg)`,
-      }}
-      aria-hidden
-    >
-      N
-    </div>
-  );
-}
-
 const TILE_URL =
   "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 const TILE_ATTRIBUTION =
@@ -184,7 +155,6 @@ export default function MapViewClient({
         <MapCenterUpdater center={center} zoom={zoom} />
         <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
         <MapZoomControls />
-        <CompassIndicator />
         {userPosition && (
         <Marker
           position={[userPosition.lat, userPosition.lng]}

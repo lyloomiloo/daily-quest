@@ -39,12 +39,10 @@ export default function CameraView({
   useEffect(() => {
     const startCamera = async () => {
       try {
-        console.log("[CameraView] Requesting camera...");
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "environment" },
           audio: false,
         });
-        console.log("[CameraView] Got stream:", stream, "tracks:", stream.getTracks().length);
 
         const video = videoRef.current;
         if (video) {
@@ -84,17 +82,14 @@ export default function CameraView({
 
           try {
             await video.play();
-            console.log("[CameraView] Video playing, dimensions:", video.videoWidth, "x", video.videoHeight);
-          } catch (playErr) {
-            console.error("[CameraView] video.play() failed:", playErr);
+          } catch {
+            // play() can fail on some devices; camera may still work
           }
           setStreamReady(true);
         } else {
-          console.warn("[CameraView] No video ref, stopping stream");
           stream.getTracks().forEach((t) => t.stop());
         }
-      } catch (err) {
-        console.error("[CameraView] Camera error:", err);
+      } catch {
         setError("Camera access denied or unavailable.");
       }
     };
@@ -106,18 +101,23 @@ export default function CameraView({
       const s = streamRef.current;
       if (s) {
         s.getTracks().forEach((track) => track.stop());
-        console.log("[CameraView] Cleanup: stopped tracks");
       }
       streamRef.current = null;
     };
   }, []);
 
+  const zoomApplyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const applyZoom = useCallback((value: number) => {
-    const track = videoTrackRef.current;
-    if (!track) return;
     const clamped = Math.max(zoomMin, Math.min(zoomMax, value));
     setZoomLevel(clamped);
-    track.applyConstraints({ zoom: clamped } as MediaTrackConstraints).catch(() => {});
+    if (zoomApplyTimeoutRef.current) clearTimeout(zoomApplyTimeoutRef.current);
+    zoomApplyTimeoutRef.current = setTimeout(() => {
+      zoomApplyTimeoutRef.current = null;
+      const track = videoTrackRef.current;
+      if (!track) return;
+      track.applyConstraints({ zoom: clamped } as MediaTrackConstraints).catch(() => {});
+    }, 120);
   }, [zoomMin, zoomMax]);
 
   const applyExposure = useCallback((value: number) => {
@@ -127,6 +127,15 @@ export default function CameraView({
     setExposureCompensation(clamped);
     track.applyConstraints({ exposureCompensation: clamped } as MediaTrackConstraints).catch(() => {});
   }, [exposureMin, exposureMax]);
+
+  useEffect(() => {
+    return () => {
+      if (zoomApplyTimeoutRef.current) {
+        clearTimeout(zoomApplyTimeoutRef.current);
+        zoomApplyTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!supportsZoom) return;
