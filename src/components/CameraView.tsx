@@ -185,83 +185,79 @@ export default function CameraView({
         <div className="w-10" />
       </div>
 
-      <div className="flex-1 relative min-h-0 flex items-center justify-center overflow-hidden bg-black">
+      <div className="flex-1 min-h-0 flex flex-col items-center overflow-hidden bg-black">
         {error ? (
-          <div className="absolute inset-0 flex items-center justify-center p-4 text-white text-center">
+          <div className="flex-1 flex items-center justify-center p-4 text-white text-center">
             {error}
           </div>
         ) : (
           <>
-            {/* Viewfinder: resizes with selection. 1:1 = square, 4:3 = vertical rectangle. Centered, black outside. */}
-            <div
-              className="relative overflow-hidden flex-shrink-0"
-              style={{
-                aspectRatio: aspectRatio === "1:1" ? "1/1" : "3/4",
-                ...(aspectRatio === "1:1"
-                  ? { width: "100%", maxHeight: "100%" }
-                  : { height: "100%", maxWidth: "100%" }),
-                transition: "aspect-ratio 0.2s ease",
-              }}
-            >
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="absolute inset-0 w-full h-full object-cover"
-                style={{ minWidth: 1, minHeight: 1, display: "block" }}
-              />
-              {!streamReady && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 font-mono text-sm text-white/80">
-                  Loading…
-                </div>
-              )}
-              {streamReady && (
-                <>
-                  <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute left-1/3 top-0 bottom-0 w-px bg-[#666] opacity-60" />
-                    <div className="absolute left-2/3 top-0 bottom-0 w-px bg-[#666] opacity-60" />
-                    <div className="absolute top-1/3 left-0 right-0 h-px bg-[#666] opacity-60" />
-                    <div className="absolute top-2/3 left-0 right-0 h-px bg-[#666] opacity-60" />
+            {/* Viewfinder: clean rectangle, aspect ratio from toggle, centered. Optional rule-of-thirds grid. */}
+            <div className="flex-1 min-h-0 w-full flex items-center justify-center min-w-0">
+              <div
+                className="relative overflow-hidden flex-shrink-0"
+                style={{
+                  aspectRatio: aspectRatio === "1:1" ? "1/1" : "3/4",
+                  ...(aspectRatio === "1:1"
+                    ? { width: "100%", maxHeight: "100%" }
+                    : { height: "100%", maxWidth: "100%" }),
+                  transition: "aspect-ratio 0.2s ease",
+                }}
+              >
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="absolute inset-0 w-full h-full object-cover"
+                  style={{ minWidth: 1, minHeight: 1, display: "block" }}
+                />
+                {!streamReady && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 font-mono text-sm text-white/80">
+                    Loading…
                   </div>
-                  <div className="absolute top-2 left-2 w-6 h-6 border-t-2 border-l-2 border-white rounded-tl" />
-                  <div className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 border-white rounded-tr" />
-                  <div className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 border-white rounded-bl" />
-                  <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-white rounded-br" />
-                  {/* FIND AND FRAME: bottom center of frame, ~20px from bottom */}
-                  <div
-                    className="absolute left-0 right-0 flex justify-center pointer-events-none"
-                    style={{ bottom: 20 }}
-                  >
-                    <span
-                      className="font-mono uppercase text-white"
-                      style={{
-                        fontSize: "11px",
-                        letterSpacing: "0.1em",
-                        opacity: 0.7,
-                      }}
+                )}
+                {streamReady && (
+                  <>
+                    <div className="absolute inset-0 pointer-events-none">
+                      <div className="absolute left-1/3 top-0 bottom-0 w-px bg-[#666] opacity-50" />
+                      <div className="absolute left-2/3 top-0 bottom-0 w-px bg-[#666] opacity-50" />
+                      <div className="absolute top-1/3 left-0 right-0 h-px bg-[#666] opacity-50" />
+                      <div className="absolute top-2/3 left-0 right-0 h-px bg-[#666] opacity-50" />
+                    </div>
+                    {/* FIND AND FRAME: inside viewfinder, bottom center, ~16px from bottom */}
+                    <div
+                      className="absolute left-0 right-0 flex justify-center pointer-events-none"
+                      style={{ bottom: 16 }}
                     >
-                      FIND AND FRAME &quot;{wordEn}&quot;
-                    </span>
-                  </div>
-                </>
-              )}
+                      <span
+                        className="font-mono uppercase text-white"
+                        style={{
+                          fontSize: "11px",
+                          letterSpacing: "0.1em",
+                          opacity: 0.7,
+                        }}
+                      >
+                        FIND AND FRAME &quot;{wordEn}&quot;
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* Below viewfinder (black area): zoom centered, ratio far right, then shutter below */}
+            {/* 24px gap */}
+            <div style={{ height: 24 }} />
+
+            {/* Row 1: Zoom toggles centered */}
             {hasMultipleZoom && (
-              <div
-                className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 font-mono"
-                style={{ bottom: 88, fontSize: "12px" }}
-              >
+              <div className="flex items-center justify-center gap-1 font-mono shrink-0" style={{ fontSize: "12px" }}>
                 {availableZoomPresets.map((preset) => (
                   <button
                     key={preset}
                     type="button"
                     onClick={() => setZoomPresetAndApply(preset)}
-                    className={`px-2 py-1 ${
-                      zoomPreset === preset ? "bg-[#000] text-[#FFF]" : "text-white"
-                    }`}
+                    className={`px-2 py-1 ${zoomPreset === preset ? "bg-[#000] text-[#FFF]" : "text-white"}`}
                     style={{ borderRadius: 0 }}
                   >
                     {preset}x
@@ -269,43 +265,47 @@ export default function CameraView({
                 ))}
               </div>
             )}
-            <div
-              className="absolute right-4 flex flex-col gap-0 font-mono"
-              style={{ bottom: 88, fontSize: "12px" }}
-            >
+
+            {/* 24px gap (or single gap if no zoom row) */}
+            <div style={{ height: 24 }} />
+
+            {/* Row 2: Shutter centered + Ratio on right, vertically centered with shutter */}
+            <div className="flex items-center justify-center shrink-0 pb-6 relative w-full">
               <button
                 type="button"
-                onClick={() => setAspectRatio("4:3")}
-                className={`w-10 h-8 flex items-center justify-center uppercase ${
-                  aspectRatio === "4:3" ? "bg-[#000] text-[#FFF]" : "text-white"
-                }`}
-                style={{ borderRadius: 0 }}
+                onClick={capture}
+                className="w-20 h-20 rounded-full border-4 border-white bg-transparent shrink-0"
+                aria-label="Take photo"
+                disabled={!streamReady}
+              />
+              <div
+                className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-0 font-mono"
+                style={{ fontSize: "12px" }}
               >
-                4:3
-              </button>
-              <button
-                type="button"
-                onClick={() => setAspectRatio("1:1")}
-                className={`w-10 h-8 flex items-center justify-center uppercase ${
-                  aspectRatio === "1:1" ? "bg-[#000] text-[#FFF]" : "text-white"
-                }`}
-                style={{ borderRadius: 0 }}
-              >
-                1:1
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setAspectRatio("4:3")}
+                  className={`w-10 h-8 flex items-center justify-center uppercase ${
+                    aspectRatio === "4:3" ? "bg-[#000] text-[#FFF]" : "text-white"
+                  }`}
+                  style={{ borderRadius: 0 }}
+                >
+                  4:3
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAspectRatio("1:1")}
+                  className={`w-10 h-8 flex items-center justify-center uppercase ${
+                    aspectRatio === "1:1" ? "bg-[#000] text-[#FFF]" : "text-white"
+                  }`}
+                  style={{ borderRadius: 0 }}
+                >
+                  1:1
+                </button>
+              </div>
             </div>
           </>
         )}
-      </div>
-
-      <div className="px-4 pb-4 pt-2 flex flex-col items-center shrink-0">
-        <button
-          type="button"
-          onClick={capture}
-          className="w-20 h-20 rounded-full border-4 border-white bg-transparent"
-          aria-label="Take photo"
-          disabled={!streamReady}
-        />
       </div>
     </div>
   );
