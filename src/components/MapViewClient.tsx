@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { LatLngExpression } from "leaflet";
+import type { Pin } from "@/lib/data";
+import {
+  GEOLOCATION_OPTIONS,
+  handleGeolocationError,
+} from "@/lib/geolocation";
 
 function MapCenterUpdater({
   center,
@@ -18,11 +23,64 @@ function MapCenterUpdater({
   }, [map, center, zoom]);
   return null;
 }
-import type { Pin } from "@/lib/data";
-import {
-  GEOLOCATION_OPTIONS,
-  handleGeolocationError,
-} from "@/lib/geolocation";
+
+function MapZoomControls() {
+  const map = useMap();
+  return (
+    <div
+      className="absolute bottom-3 right-3 flex flex-col border-2 border-black bg-white z-[400]"
+      style={{ borderRadius: 0 }}
+    >
+      <button
+        type="button"
+        onClick={() => map.zoomIn()}
+        className="w-9 h-9 flex items-center justify-center text-black font-mono text-lg border-b border-black"
+        style={{ borderRadius: 0 }}
+        aria-label="Zoom in"
+      >
+        +
+      </button>
+      <button
+        type="button"
+        onClick={() => map.zoomOut()}
+        className="w-9 h-9 flex items-center justify-center text-black font-mono text-lg"
+        style={{ borderRadius: 0 }}
+        aria-label="Zoom out"
+      >
+        −
+      </button>
+    </div>
+  );
+}
+
+function CompassIndicator() {
+  const [heading, setHeading] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.DeviceOrientationEvent) return;
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      if (e.alpha != null && !isNaN(e.alpha)) setHeading(e.alpha);
+    };
+    window.addEventListener("deviceorientation", handleOrientation);
+    return () => window.removeEventListener("deviceorientation", handleOrientation);
+  }, []);
+
+  // alpha = 0 is North; rotate so N points north (rotation = -alpha)
+  const rotation = heading != null ? -heading : 0;
+
+  return (
+    <div
+      className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center bg-white border-2 border-black z-[400] font-mono text-xs font-bold text-black pointer-events-none"
+      style={{
+        borderRadius: 0,
+        transform: `rotate(${rotation}deg)`,
+      }}
+      aria-hidden
+    >
+      N
+    </div>
+  );
+}
 
 const TILE_URL =
   "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
@@ -125,6 +183,8 @@ export default function MapViewClient({
       >
         <MapCenterUpdater center={center} zoom={zoom} />
         <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+        <MapZoomControls />
+        <CompassIndicator />
         {userPosition && (
         <Marker
           position={[userPosition.lat, userPosition.lng]}

@@ -10,6 +10,10 @@ interface CameraViewProps {
   onBack: () => void;
 }
 
+function getTouchDistance(a: Touch, b: Touch): number {
+  return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+}
+
 export default function CameraView({
   wordEn,
   onCapture,
@@ -17,9 +21,20 @@ export default function CameraView({
 }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const videoTrackRef = useRef<MediaStreamTrack | null>(null);
+  const pinchStartRef = useRef<{ distance: number; zoom: number } | null>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [streamReady, setStreamReady] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("4:3");
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [zoomMin, setZoomMin] = useState(1);
+  const [zoomMax, setZoomMax] = useState(1);
+  const [supportsZoom, setSupportsZoom] = useState(false);
+  const [exposureCompensation, setExposureCompensation] = useState(0);
+  const [exposureMin, setExposureMin] = useState(0);
+  const [exposureMax, setExposureMax] = useState(0);
+  const [supportsExposure, setSupportsExposure] = useState(false);
 
   useEffect(() => {
     const startCamera = async () => {
@@ -35,6 +50,38 @@ export default function CameraView({
         if (video) {
           video.srcObject = stream;
           streamRef.current = stream;
+          const videoTrack = stream.getVideoTracks()[0] ?? null;
+          videoTrackRef.current = videoTrack;
+
+          if (videoTrack) {
+            const caps = videoTrack.getCapabilities() as Record<string, { min?: number; max?: number; step?: number }>;
+            const settings = videoTrack.getSettings() as Record<string, number | undefined>;
+            const supported = navigator.mediaDevices.getSupportedConstraints?.() ?? {};
+            if (supported.zoom && typeof caps.zoom === "object" && caps.zoom.min != null && caps.zoom.max != null) {
+              const min = caps.zoom.min;
+              const max = caps.zoom.max;
+              setZoomMin(min);
+              setZoomMax(max);
+              const current = settings.zoom;
+              setZoomLevel(typeof current === "number" ? current : min);
+              setSupportsZoom(max > min);
+            }
+            if (
+              supported.exposureCompensation &&
+              typeof caps.exposureCompensation === "object" &&
+              caps.exposureCompensation.min != null &&
+              caps.exposureCompensation.max != null
+            ) {
+              setExposureMin(caps.exposureCompensation.min);
+              setExposureMax(caps.exposureCompensation.max);
+              const current = settings.exposureCompensation;
+              setExposureCompensation(
+                typeof current === "number" ? current : caps.exposureCompensation.min
+              );
+              setSupportsExposure(caps.exposureCompensation.max !== caps.exposureCompensation.min);
+            }
+          }
+
           try {
             await video.play();
             console.log("[CameraView] Video playing, dimensions:", video.videoWidth, "x", video.videoHeight);
@@ -55,6 +102,7 @@ export default function CameraView({
     startCamera();
 
     return () => {
+      videoTrackRef.current = null;
       const s = streamRef.current;
       if (s) {
         s.getTracks().forEach((track) => track.stop());
@@ -63,6 +111,60 @@ export default function CameraView({
       streamRef.current = null;
     };
   }, []);
+
+  const applyZoom = useCallback((value: number) => {
+    const track = videoTrackRef.current;
+    if (!track) return;
+    const clamped = Math.max(zoomMin, Math.min(zoomMax, value));
+    setZoomLevel(clamped);
+    track.applyConstraints({ zoom: clamped }).catch(() => {});
+  }, [zoomMin, zoomMax]);
+
+  const applyExposure = useCallback((value: number) => {
+    const track = videoTrackRef.current;
+    if (!track) return;
+    const clamped = Math.max(exposureMin, Math.min(exposureMax, value));
+    setExposureCompensation(clamped);
+    track.applyConstraints({ exposureCompensation: clamped }).catch(() => {});
+  }, [exposureMin, exposureMax]);
+
+  useEffect(() => {
+    if (!supportsZoom) return;
+    const el = videoRef.current?.parentElement;
+    if (!el) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        pinchStartRef.current = {
+          distance: getTouchDistance(e.touches[0], e.touches[1]),
+          zoom: zoomLevel,
+        };
+      }
+    };
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchStartRef.current) {
+        e.preventDefault();
+        const distance = getTouchDistance(e.touches[0], e.touches[1]);
+        const scale = distance / pinchStartRef.current.distance;
+        const next = pinchStartRef.current.zoom * scale;
+        applyZoom(next);
+      }
+    };
+    const handleTouchEnd = () => {
+      pinchStartRef.current = null;
+    };
+
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+    el.addEventListener("touchmove", handleTouchMove, { passive: false });
+    el.addEventListener("touchend", handleTouchEnd);
+    el.addEventListener("touchcancel", handleTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", handleTouchMove);
+      el.removeEventListener("touchend", handleTouchEnd);
+      el.removeEventListener("touchcancel", handleTouchEnd);
+    };
+  }, [supportsZoom, zoomLevel, applyZoom]);
 
   // Crop region in video coords: 1:1 = square, 4:3 = portrait (3 wide, 4 tall → width/height = 3/4)
   const cropToAspect = useCallback(
@@ -190,6 +292,33 @@ export default function CameraView({
                 </>
               )}
             </div>
+
+            {/* Zoom level indicator (only if device supports zoom) */}
+            {supportsZoom && streamReady && (
+              <div
+                className="absolute top-3 left-3 font-mono text-xs bg-black/70 text-white px-2 py-1"
+                style={{ borderRadius: 0 }}
+              >
+                {zoomLevel.toFixed(1)}x
+              </div>
+            )}
+
+            {/* Exposure slider (only if device supports it) */}
+            {supportsExposure && streamReady && (
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
+                <span className="font-mono text-[10px] text-white/80 uppercase">Exp</span>
+                <input
+                  type="range"
+                  min={exposureMin}
+                  max={exposureMax}
+                  step={0.1}
+                  value={exposureCompensation}
+                  onChange={(e) => applyExposure(Number(e.target.value))}
+                  className="w-16 h-1.5 accent-white bg-white/30"
+                  style={{ transform: "rotate(-90deg)", marginTop: "2rem" }}
+                />
+              </div>
+            )}
 
             {/* Brutalist toggle: bottom-right, 8–12px from edges. Sharp, high contrast. */}
             <div
