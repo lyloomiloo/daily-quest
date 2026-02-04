@@ -64,6 +64,7 @@ export default function CameraView({
     };
   }, []);
 
+  // Crop region in video coords: 1:1 = square, 4:3 = portrait (3 wide, 4 tall → width/height = 3/4)
   const cropToAspect = useCallback(
     (video: HTMLVideoElement): { sx: number; sy: number; sw: number; sh: number } => {
       const vw = video.videoWidth;
@@ -77,21 +78,17 @@ export default function CameraView({
           sh: size,
         };
       }
-      const targetRatio = 4 / 3;
-      const currentRatio = vw / vh;
-      let sw: number, sh: number, sx: number, sy: number;
-      if (currentRatio > targetRatio) {
-        sh = vh;
-        sw = Math.round(vh * targetRatio);
-        sx = (vw - sw) / 2;
-        sy = 0;
+      // 4:3 portrait: width/height = 3/4, so height > width
+      const targetRatio = 3 / 4; // sw / sh = 3/4
+      if (vh >= vw / targetRatio) {
+        const sw = vw;
+        const sh = Math.round(vw / targetRatio);
+        return { sx: 0, sy: (vh - sh) / 2, sw, sh };
       } else {
-        sw = vw;
-        sh = Math.round(vw / targetRatio);
-        sx = 0;
-        sy = (vh - sh) / 2;
+        const sh = vh;
+        const sw = Math.round(vh * targetRatio);
+        return { sx: (vw - sw) / 2, sy: 0, sw, sh };
       }
-      return { sx, sy, sw, sh };
     },
     [aspectRatio]
   );
@@ -144,82 +141,90 @@ export default function CameraView({
         <span className="font-mono text-sm text-white/80 uppercase tracking-wider">
           {wordEn}
         </span>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setAspectRatio("1:1")}
-            className={`px-2 py-1 font-mono text-xs uppercase ${
-              aspectRatio === "1:1"
-                ? "bg-white text-black"
-                : "text-white/70 hover:text-white"
-            }`}
-          >
-            1:1
-          </button>
-          <button
-            type="button"
-            onClick={() => setAspectRatio("4:3")}
-            className={`px-2 py-1 font-mono text-xs uppercase ${
-              aspectRatio === "4:3"
-                ? "bg-white text-black"
-                : "text-white/70 hover:text-white"
-            }`}
-          >
-            4:3
-          </button>
-        </div>
+        <div className="w-10" />
       </div>
 
-      <div className="flex-1 relative min-h-0 flex items-center justify-center overflow-hidden">
+      <div className="flex-1 relative min-h-0 flex items-center justify-center overflow-hidden bg-black">
         {error ? (
           <div className="absolute inset-0 flex items-center justify-center p-4 text-white text-center">
             {error}
           </div>
         ) : (
           <>
-            {/* Video always mounted so ref is set when useEffect runs; explicit size so it's not 0x0 */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 w-full h-full object-cover"
+            {/* Viewfinder: resizes with selection. 1:1 = square, 4:3 = vertical rectangle. Centered, black outside. */}
+            <div
+              className="relative overflow-hidden flex-shrink-0"
               style={{
-                width: "100%",
-                height: "100%",
-                minWidth: 1,
-                minHeight: 1,
-                display: "block",
+                aspectRatio: aspectRatio === "1:1" ? "1/1" : "3/4",
+                ...(aspectRatio === "1:1"
+                  ? { width: "100%", maxHeight: "100%" }
+                  : { height: "100%", maxWidth: "100%" }),
+                transition: "aspect-ratio 0.2s ease",
               }}
-            />
-            {!streamReady && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/60 font-mono text-sm text-white/80">
-                Loading…
-              </div>
-            )}
-            {streamReady && (
-              <>
-                <div
-                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                  style={{
-                    aspectRatio: aspectRatio === "1:1" ? "1" : "4/3",
-                    maxWidth: "100%",
-                    maxHeight: "100%",
-                  }}
-                >
-                  <div className="relative w-full h-full">
+            >
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ minWidth: 1, minHeight: 1, display: "block" }}
+              />
+              {!streamReady && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 font-mono text-sm text-white/80">
+                  Loading…
+                </div>
+              )}
+              {streamReady && (
+                <>
+                  <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute left-1/3 top-0 bottom-0 w-px bg-[#666] opacity-60" />
                     <div className="absolute left-2/3 top-0 bottom-0 w-px bg-[#666] opacity-60" />
                     <div className="absolute top-1/3 left-0 right-0 h-px bg-[#666] opacity-60" />
                     <div className="absolute top-2/3 left-0 right-0 h-px bg-[#666] opacity-60" />
                   </div>
-                </div>
-                <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-white rounded-tl pointer-events-none" />
-                <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-white rounded-tr pointer-events-none" />
-                <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-white rounded-bl pointer-events-none" />
-                <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-white rounded-br pointer-events-none" />
-              </>
-            )}
+                  <div className="absolute top-2 left-2 w-6 h-6 border-t-2 border-l-2 border-white rounded-tl" />
+                  <div className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 border-white rounded-tr" />
+                  <div className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 border-white rounded-bl" />
+                  <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-white rounded-br" />
+                </>
+              )}
+            </div>
+
+            {/* Brutalist toggle: bottom-right, 8–12px from edges. Sharp, high contrast. */}
+            <div
+              className="absolute flex items-stretch font-mono text-xs uppercase tracking-wider overflow-hidden border-2 border-black"
+              style={{
+                bottom: 10,
+                right: 10,
+                borderRadius: 0,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setAspectRatio("1:1")}
+                className={`px-2 py-1.5 border-r-2 border-black ${
+                  aspectRatio === "1:1"
+                    ? "bg-black text-white"
+                    : "bg-white text-black"
+                }`}
+                style={{ borderRadius: 0 }}
+              >
+                1:1
+              </button>
+              <button
+                type="button"
+                onClick={() => setAspectRatio("4:3")}
+                className={`px-2 py-1.5 ${
+                  aspectRatio === "4:3"
+                    ? "bg-black text-white"
+                    : "bg-white text-black"
+                }`}
+                style={{ borderRadius: 0 }}
+              >
+                4:3
+              </button>
+            </div>
           </>
         )}
       </div>
