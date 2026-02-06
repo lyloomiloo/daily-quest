@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PhoneFrame from "@/components/PhoneFrame";
 import Header from "@/components/Header";
@@ -8,7 +8,6 @@ import DailyWordSection from "@/components/DailyWordSection";
 import MapView from "@/components/MapView";
 import CaptureButton from "@/components/CaptureButton";
 import Lightbox from "@/components/Lightbox";
-import CameraView from "@/components/CameraView";
 import PhotoPreview from "@/components/PhotoPreview";
 import UploadConfirmation from "@/components/UploadConfirmation";
 import LocationGate from "@/components/LocationGate";
@@ -24,12 +23,7 @@ import { getDailyWord, getCachedWord, setCachedWord } from "@/lib/words";
 const BARCELONA_CENTER: [number, number] = [41.3874, 2.1686];
 const DEFAULT_ZOOM = 15;
 
-type Screen =
-  | "map"
-  | "lightbox"
-  | "camera"
-  | "preview"
-  | "upload-confirm";
+type Screen = "map" | "lightbox" | "preview" | "upload-confirm";
 
 const TESTDATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -49,6 +43,8 @@ function PageContent() {
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [newPin, setNewPin] = useState<Pin | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const cancelCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [dailyWord, setDailyWord] = useState<DailyWord | null>(null);
   const wordFetchRef = useRef<{ date: string; promise: Promise<DailyWord> } | null>(null);
@@ -132,17 +128,47 @@ function PageContent() {
   };
 
   const handleCaptureClick = () => {
-    setScreen("camera");
+    const input = cameraInputRef.current;
+    if (!input) return;
+
+    const handleFocus = () => {
+      window.removeEventListener("focus", handleFocus);
+      cancelCheckTimeoutRef.current = setTimeout(() => {
+        cancelCheckTimeoutRef.current = null;
+        const hasFile = input.files && input.files.length > 0;
+        if (!hasFile) {
+          console.log("Camera cancelled, staying on map. Screen:", screen);
+          setScreen("map");
+        }
+      }, 300);
+    };
+
+    window.addEventListener("focus", handleFocus);
+    input.value = "";
+    input.click();
   };
 
-  const handlePhotoCaptured = (blob: Blob) => {
-    setCapturedBlob(blob);
-    setScreen("preview");
-  };
+  const handleFileFromCamera = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        setCapturedBlob(file);
+        setScreen("preview");
+      }
+      if (cameraInputRef.current) {
+        cameraInputRef.current.value = "";
+      }
+    },
+    []
+  );
 
   const handleRetake = () => {
     setCapturedBlob(null);
-    setScreen("camera");
+    setScreen("map");
+    // Re-open native camera after a tick so map is visible briefly
+    setTimeout(() => {
+      cameraInputRef.current?.click();
+    }, 0);
   };
 
   const handleDropIt = (pin: Pin) => {
@@ -160,8 +186,21 @@ function PageContent() {
     return () => clearTimeout(t);
   }, [screen, newPin]);
 
-  const handleBackFromCamera = () => setScreen("map");
   const handleBackFromPreview = () => setScreen("map");
+
+  // Debug: log screen state (remove in production if desired)
+  useEffect(() => {
+    console.log("Current screen:", screen);
+  }, [screen]);
+
+  // Cleanup cancel-check timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (cancelCheckTimeoutRef.current !== null) {
+        clearTimeout(cancelCheckTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const appContent =
     dailyWord === null ? (
@@ -194,15 +233,16 @@ function PageContent() {
             <div className="shrink-0">
               <CaptureButton onClick={handleCaptureClick} />
             </div>
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileFromCamera}
+              style={{ display: "none" }}
+              aria-label="Camera capture"
+            />
           </div>
-        )}
-
-        {screen === "camera" && (
-          <CameraView
-            wordEn={dailyWord.word_en}
-            onCapture={handlePhotoCaptured}
-            onBack={handleBackFromCamera}
-          />
         )}
 
         {screen === "preview" && capturedBlob && (
