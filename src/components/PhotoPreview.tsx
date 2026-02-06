@@ -30,22 +30,36 @@ function cropToSquare(blob: Blob): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(blob);
+    
     img.onload = () => {
-      URL.revokeObjectURL(url);
-      const size = Math.min(img.width, img.height);
-      const x = (img.width - size) / 2;
-      const y = (img.height - size) / 2;
+      // Use naturalWidth/naturalHeight to get actual image dimensions
+      const imageWidth = img.naturalWidth || img.width;
+      const imageHeight = img.naturalHeight || img.height;
+      
+      // Calculate square crop: use the shorter dimension
+      const size = Math.min(imageWidth, imageHeight);
+      const x = (imageWidth - size) / 2;
+      const y = (imageHeight - size) / 2;
+      
+      // Create canvas with square dimensions
       const canvas = document.createElement("canvas");
       canvas.width = size;
       canvas.height = size;
+      
       const ctx = canvas.getContext("2d");
       if (!ctx) {
+        URL.revokeObjectURL(url);
         reject(new Error("Could not get canvas context"));
         return;
       }
+      
+      // Draw the cropped region: source (x, y, size, size) -> destination (0, 0, size, size)
       ctx.drawImage(img, x, y, size, size, 0, 0, size, size);
+      
+      // Convert canvas to blob
       canvas.toBlob(
         (croppedBlob) => {
+          URL.revokeObjectURL(url);
           if (croppedBlob) {
             resolve(croppedBlob);
           } else {
@@ -56,10 +70,12 @@ function cropToSquare(blob: Blob): Promise<Blob> {
         0.9
       );
     };
+    
     img.onerror = () => {
       URL.revokeObjectURL(url);
       reject(new Error("Failed to load image"));
     };
+    
     img.src = url;
   });
 }
