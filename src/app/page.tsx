@@ -161,7 +161,7 @@ function PageContent() {
   }, [screen, newPin]);
 
   const handleBackFromCamera = () => setScreen("map");
-  const handleBackFromPreview = () => setScreen("camera");
+  const handleBackFromPreview = () => setScreen("map");
 
   const appContent =
     dailyWord === null ? (
