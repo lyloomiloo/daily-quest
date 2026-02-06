@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useEffect } from "react";
 import type { Pin } from "@/lib/data";
 import { downloadImage } from "@/lib/download";
 import { uploadPhotoAndCreatePin } from "@/lib/upload";
@@ -25,6 +25,45 @@ function randomBarcelonaCoords(): { lat: number; lng: number } {
   return { lat, lng };
 }
 
+// Crop image to 1:1 square (center crop)
+function cropToSquare(blob: Blob): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const size = Math.min(img.width, img.height);
+      const x = (img.width - size) / 2;
+      const y = (img.height - size) / 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Could not get canvas context"));
+        return;
+      }
+      ctx.drawImage(img, x, y, size, size, 0, 0, size, size);
+      canvas.toBlob(
+        (croppedBlob) => {
+          if (croppedBlob) {
+            resolve(croppedBlob);
+          } else {
+            reject(new Error("Failed to create cropped blob"));
+          }
+        },
+        "image/jpeg",
+        0.9
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Failed to load image"));
+    };
+    img.src = url;
+  });
+}
+
 export default function PhotoPreview({
   blob,
   wordDate,
@@ -34,13 +73,30 @@ export default function PhotoPreview({
 }: PhotoPreviewProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const previewUrl = useMemo(() => URL.createObjectURL(blob), [blob]);
+  const [croppedBlob, setCroppedBlob] = useState<Blob | null>(null);
+  const previewUrl = useMemo(() => {
+    if (croppedBlob) {
+      return URL.createObjectURL(croppedBlob);
+    }
+    return null;
+  }, [croppedBlob]);
+
+  // Crop image to 1:1 square on mount
+  useEffect(() => {
+    cropToSquare(blob)
+      .then(setCroppedBlob)
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : "Failed to process image");
+      });
+  }, [blob]);
 
   const handleSave = useCallback(() => {
+    if (!previewUrl) return;
     downloadImage(previewUrl, `daily-quest-${wordDate}.jpg`);
   }, [previewUrl, wordDate]);
 
   const handleDropIt = async () => {
+    if (!croppedBlob) return;
     setUploading(true);
     setError(null);
     try {
@@ -79,7 +135,7 @@ export default function PhotoPreview({
       }
 
       const uploadedPin = await uploadPhotoAndCreatePin({
-        blob,
+        blob: croppedBlob,
         latitude: lat,
         longitude: lng,
         streetName,
@@ -94,7 +150,7 @@ export default function PhotoPreview({
       // Fallback when Supabase is not configured or upload failed: use blob URL (pin only in local state)
       const pin: Pin = {
         id: `pin-${Date.now()}`,
-        image_url: previewUrl,
+        image_url: previewUrl || "",
         latitude: lat,
         longitude: lng,
         street_name: streetName,
@@ -134,11 +190,17 @@ export default function PhotoPreview({
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-4">
-        <img
-          src={previewUrl}
-          alt="Preview"
-          className="max-w-full max-h-full object-contain"
-        />
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt="Preview"
+            className="max-w-full max-h-full object-contain"
+          />
+        ) : (
+          <div className="flex items-center justify-center text-white font-mono text-sm">
+            Processing image...
+          </div>
+        )}
         <div className="w-full flex justify-end mt-2">
           <button
             type="button"
